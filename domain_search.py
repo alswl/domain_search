@@ -34,6 +34,8 @@ def can_taken(domain, lock):
         )
         urlf = urllib2.urlopen(req, timeout=10)
         content = urlf.read()
+        if not 'success' in content:
+            return
         if 'No match' in content:
             can = True
     except Exception, e:
@@ -56,7 +58,7 @@ def search(domains, results):
             continue
 
         thread.start_new(can_taken, (domain, lock))
-        time.sleep(0.5)
+        time.sleep(0.2)
     sys.stdout.write('\n')
     sys.stdout.flush()
 
