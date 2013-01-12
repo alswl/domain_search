@@ -9,11 +9,9 @@ import urllib2
 import codecs
 import time
 from datetime import datetime
+import thread
 
-try:
-    import gevent.monkey; gevent.monkey.patch_all()
-except ImportError:
-    pass
+import gevent.monkey; gevent.monkey.patch_all()
 import pinyin
 
 def init():
@@ -28,7 +26,8 @@ def init():
             phrases.append(i + j)
     return [x for x in set(phrases)]
 
-def can_taken(domain):
+def can_taken(domain, lock):
+    can = False
     try:
         req = urllib2.Request(
             url='http://whomsy.com/api/' + domain
@@ -36,27 +35,29 @@ def can_taken(domain):
         urlf = urllib2.urlopen(req, timeout=10)
         content = urlf.read()
         if 'No match' in content:
-            return True
+            can = True
     except Exception, e:
         pass
-    return False
+    if lock.acquire():
+        sys.stdout.write('Domain: %s' %domain)
+        if can:
+            sys.stdout.write(' [v]\n')
+        else:
+            sys.stdout.write(' [x]\n')
+        sys.stdout.flush()
+        lock.release()
 
 def search(domains, results):
-    i = 0
     now = datetime.now()
+    lock = thread.allocate()
     sys.stdout.write('Date: %s' %now.strftime('%Y-%m-%d %H:%M:%S\n\n'))
     for domain in domains:
         if domain in results:
             continue
-        sys.stdout.write('Domain: %s' %domain)
-        if can_taken(domain):
-            sys.stdout.write(' [v]\n')
-            i += 1
-        else:
-            sys.stdout.write(' [x]\n')
-        sys.stdout.flush()
-        time.sleep(0.1)
-    sys.stdout.write('\nTotal: %d, avaiable: %d\n\n' %(len(domains), i))
+
+        thread.start_new(can_taken, (domain, lock))
+        time.sleep(0.5)
+    sys.stdout.write('\n')
     sys.stdout.flush()
 
 def main():
