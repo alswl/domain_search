@@ -10,6 +10,7 @@ import codecs
 import time
 from datetime import datetime
 import thread
+import subprocess
 
 import gevent.monkey; gevent.monkey.patch_all()
 import pinyin
@@ -26,6 +27,18 @@ def init():
             phrases.append(i + j)
     return [x for x in set(phrases)]
 
+def write_log(domain, lock, can):
+    if lock.acquire():
+        sys.stdout.write('%d, Domain: %s' %(time.time(), domain))
+        if can == None:
+            sys.stdout.write(' [e]\n')
+        elif can == True:
+            sys.stdout.write(' [v]\n')
+        else:
+            sys.stdout.write(' [x]\n')
+        sys.stdout.flush()
+        lock.release()
+
 def can_taken_via_whomsy(domain, lock):
     can = False
     try:
@@ -39,34 +52,20 @@ def can_taken_via_whomsy(domain, lock):
         if 'No match' in content:
             can = True
     except Exception, e:
-        pass
-    if lock.acquire():
-        sys.stdout.write('Domain: %s' %domain)
-        if can:
-            sys.stdout.write(' [v]\n')
-        else:
-            sys.stdout.write(' [x]\n')
-        sys.stdout.flush()
-        lock.release()
+        can = None
+    write_log(domain, lock, can)
 
 def can_taken_via_whois(domain, lock):
     can = False
     try:
-        process = subprocess.Popen('whois "log4d.com"', shell=True,
+        process = subprocess.Popen('whois %s' %domain, shell=True,
                                    stdout=subprocess.PIPE)
         content = process.stdout.read()
         if 'No match' in content:
             can = True
     except Exception, e:
-        pass
-    if lock.acquire():
-        sys.stdout.write('Domain: %s' %domain)
-        if can:
-            sys.stdout.write(' [v]\n')
-        else:
-            sys.stdout.write(' [x]\n')
-        sys.stdout.flush()
-        lock.release()
+        can = None
+    write_log(domain, lock, can)
 
 def search(domains, results):
     now = datetime.now()
@@ -76,8 +75,9 @@ def search(domains, results):
         if domain in results:
             continue
 
-        #thread.start_new(can_taken, (domain, lock))
-        can_taken_via_whois(domain, lock)
+        thread.start_new(can_taken_via_whois, (domain, lock))
+
+        #can_taken_via_whois(domain, lock)
         time.sleep(0.5)
     sys.stdout.write('\n')
     sys.stdout.flush()
