@@ -27,6 +27,17 @@ def init():
             phrases.append(i + j)
     return [x for x in set(phrases)]
 
+def init_26():
+    lst = 'abcdefghijklmnopqrstuvwxyz'
+    phrases = []
+    for i in lst:
+        words = ''
+        for j in lst:
+            for k in lst:
+                for l in lst:
+                    phrases.append(i + j + k + l)
+    return phrases
+
 def write_log(domain, lock, can):
     if lock.acquire():
         sys.stdout.write('%d, Domain: %s' %(time.time(), domain))
@@ -83,7 +94,7 @@ def search(domains, results):
     sys.stdout.flush()
 
 def main():
-    words = init()
+    words = init_26()
     domains = [x + '.com' for x in words]
     results_file = codecs.open('results.txt', encoding='utf-8')
     results = results_file.read()
