@@ -3,7 +3,7 @@
 """
 搜索常见字全拼域名
 """
-
+import argparse
 import codecs
 import subprocess
 import sys
@@ -20,7 +20,7 @@ def init():
     phrases = []
     f = codecs.open('words.dic', encoding='utf-8')
     words = [x.strip() for x in f.read().splitlines()]
-    words.append(u'')
+    words.append('')
     f.close()
     pinyins = set([lazy_pinyin(x)[0] for x in words if len(x) > 0])
     for i in pinyins:
@@ -34,7 +34,7 @@ def init_pinyin_less(length=3):
     phrases = []
     f = codecs.open('words.dic', encoding='utf-8')
     words = [x.strip() for x in f.read().splitlines()]
-    words.append(u'')
+    words.append('')
     f.close()
     pinyins = set([lazy_pinyin(x)[0] for x in words if len(x) > 0])
     return [x for x in set(pinyins) if len(x) == length]
@@ -44,7 +44,7 @@ def init_popular_less_3():
     phrases = []
     f = codecs.open('./popular_less_3.txt', encoding='utf-8')
     words = [x.strip() for x in f.read().splitlines()]
-    words.append(u'')
+    words.append('')
     f.close()
     return words
 
@@ -77,13 +77,13 @@ def write_log(domain, lock, can):
 
 
 def can_taken_via_whomsy(domain, lock):
-    import urllib2
+    import urllib.request, urllib.error, urllib.parse
     can = False
     try:
-        req = urllib2.Request(
+        req = urllib.request.Request(
             url='http://whomsy.com/api/' + domain
         )
-        urlf = urllib2.urlopen(req, timeout=10)
+        urlf = urllib.request.urlopen(req, timeout=10)
         content = urlf.read()
         if not 'success' in content:
             return
@@ -123,13 +123,13 @@ def can_taken_via_dig(domain, lock):
     return can
 
 
-def search(domains, results):
+def search(domains):
     now = datetime.now()
     lock = threading.Lock()
     sys.stdout.write('Date: %s' % now.strftime('%Y-%m-%d %H:%M:%S\n\n'))
     for domain in domains:
-        if domain in results:
-            continue
+        # if domain in results:
+        #     continue
 
         # thread.start_new(can_taken_via_whois, (domain, lock))
         # can_taken_via_whois(domain, lock)
@@ -139,11 +139,30 @@ def search(domains, results):
 
 
 def main():
-    # words = init_26()
-    # words = ['xxx' + x for x in init_pinyin_less(4)]
-    words = [x for x in init_pinyin_less(4)]
-    domains = [x + '.com' for x in words]
-    search(domains, results)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--prefix', type=str, default='')
+    parser.add_argument('--suffix', type=str, default='.com')
+    parser.add_argument('--type', type=str, default='pinyin4', choices=['pinyin4', '26', 'en3'])
+    args = parser.parse_args()
+
+    if args.type is None:
+        parser.print_help()
+        return
+
+    prefix = args.prefix
+    suffix = args.suffix
+    if args.type == 'pinyin4':
+        words = [prefix + x for x in init_pinyin_less(4)]
+    elif args.type == '26':
+        words = [prefix + x for x in init_26()]
+    elif args.type == 'en3':
+        words = [prefix + x for x in init_popular_less_3()]
+    else:
+        parser.print_help()
+        return
+
+    domains = [x + suffix for x in words]
+    search(domains)
 
 
 if __name__ == '__main__':
