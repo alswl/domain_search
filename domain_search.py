@@ -1,31 +1,53 @@
-#coding=utf-8
+# coding=utf-8
 
 """
 搜索常见字全拼域名
 """
 
-import sys
-import urllib2
 import codecs
-import time
-from datetime import datetime
-import thread
 import subprocess
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
-import gevent.monkey; gevent.monkey.patch_all()
-import pinyin
+executor = ThreadPoolExecutor(max_workers=8)
+
 
 def init():
+    from pypinyin import lazy_pinyin
     phrases = []
     f = codecs.open('words.dic', encoding='utf-8')
     words = [x.strip() for x in f.read().splitlines()]
     words.append(u'')
     f.close()
-    pinyins = set([pinyin.get_pinyin(x) for x in words if len(x) > 0])
+    pinyins = set([lazy_pinyin(x)[0] for x in words if len(x) > 0])
     for i in pinyins:
         for j in pinyins:
             phrases.append(i + j)
     return [x for x in set(phrases)]
+
+
+def init_pinyin_less(length=3):
+    from pypinyin import lazy_pinyin
+    phrases = []
+    f = codecs.open('words.dic', encoding='utf-8')
+    words = [x.strip() for x in f.read().splitlines()]
+    words.append(u'')
+    f.close()
+    pinyins = set([lazy_pinyin(x)[0] for x in words if len(x) > 0])
+    return [x for x in set(pinyins) if len(x) == length]
+
+
+def init_popular_less_3():
+    phrases = []
+    f = codecs.open('./popular_less_3.txt', encoding='utf-8')
+    words = [x.strip() for x in f.read().splitlines()]
+    words.append(u'')
+    f.close()
+    return words
+
 
 def init_26():
     lst = 'abcdefghijklmnopqrstuvwxyz'
@@ -38,19 +60,24 @@ def init_26():
                     phrases.append(i + j + k + l)
     return phrases
 
+
 def write_log(domain, lock, can):
     if lock.acquire():
-        sys.stdout.write('%d, Domain: %s' %(time.time(), domain))
-        if can == None:
-            sys.stdout.write(' [e]\n')
+        sys.stdout.write('%d, Domain: %s' % (time.time(), domain))
+        if can == False:
+            sys.stdout.write(' [x]\n')
         elif can == True:
             sys.stdout.write(' [v]\n')
+        elif can == None:
+            sys.stdout.write(' [ ]\n')
         else:
-            sys.stdout.write(' [x]\n')
+            sys.stdout.write(' [?]\n')
         sys.stdout.flush()
         lock.release()
 
+
 def can_taken_via_whomsy(domain, lock):
+    import urllib2
     can = False
     try:
         req = urllib2.Request(
@@ -62,44 +89,62 @@ def can_taken_via_whomsy(domain, lock):
             return
         if 'No match' in content:
             can = True
-    except Exception, e:
+    except Exception as e:
         can = None
     write_log(domain, lock, can)
+    return can
+
 
 def can_taken_via_whois(domain, lock):
     can = False
     try:
-        process = subprocess.Popen('whois %s' %domain, shell=True,
+        process = subprocess.Popen('whois %s' % domain, shell=True,
                                    stdout=subprocess.PIPE)
-        content = process.stdout.read()
+        content = str(process.stdout.read(), encoding='utf-8')
         if 'No match' in content:
             can = True
-    except Exception, e:
+    except Exception as e:
         can = None
     write_log(domain, lock, can)
+    return can
+
+
+def can_taken_via_dig(domain, lock):
+    can = False
+    try:
+        process = subprocess.Popen('dig @114.114.114.114 NS %s' % domain, shell=True,
+                                   stdout=subprocess.PIPE)
+        content = str(process.stdout.read(), encoding='utf-8')
+        if '.gtld-servers.net.' in content:
+            can = True
+    except Exception as e:
+        can = None
+    write_log(domain, lock, can)
+    return can
+
 
 def search(domains, results):
     now = datetime.now()
-    lock = thread.allocate()
-    sys.stdout.write('Date: %s' %now.strftime('%Y-%m-%d %H:%M:%S\n\n'))
+    lock = threading.Lock()
+    sys.stdout.write('Date: %s' % now.strftime('%Y-%m-%d %H:%M:%S\n\n'))
     for domain in domains:
         if domain in results:
             continue
 
-        thread.start_new(can_taken_via_whois, (domain, lock))
-
-        #can_taken_via_whois(domain, lock)
-        time.sleep(0.5)
+        # thread.start_new(can_taken_via_whois, (domain, lock))
+        # can_taken_via_whois(domain, lock)
+        executor.submit(can_taken_via_dig, domain, lock)
     sys.stdout.write('\n')
     sys.stdout.flush()
 
+
 def main():
-    words = init_26()
+    # words = init_26()
+    # words = ['xxx' + x for x in init_pinyin_less(4)]
+    words = [x for x in init_pinyin_less(4)]
     domains = [x + '.com' for x in words]
-    results_file = codecs.open('results.txt', encoding='utf-8')
-    results = results_file.read()
-    results_file.close()
     search(domains, results)
+
 
 if __name__ == '__main__':
     main()
