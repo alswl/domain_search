@@ -31,7 +31,6 @@ def init():
 
 def init_pinyin_less(length=3):
     from pypinyin import lazy_pinyin
-    phrases = []
     f = codecs.open('words.dic', encoding='utf-8')
     words = [x.strip() for x in f.read().splitlines()]
     words.append('')
@@ -43,11 +42,12 @@ def init_pinyin_less(length=3):
 def init_popular_less_2():
     return init_popular_less(2)
 
+
 def init_popular_less_3():
     return init_popular_less(3)
 
+
 def init_popular_less(limit):
-    phrases = []
     f = codecs.open('./popular_less_%d.txt' % limit, encoding='utf-8')
     words = [x.strip() for x in f.read().splitlines()]
     words.append('')
@@ -83,7 +83,7 @@ def write_log(domain, lock, can):
 
 
 def can_taken_via_whomsy(domain, lock):
-    import urllib.request, urllib.error, urllib.parse
+    import urllib.request, urllib.parse
     can = False
     try:
         req = urllib.request.Request(
@@ -148,7 +148,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--prefix', type=str, default='')
     parser.add_argument('--suffix', type=str, default='.com')
-    parser.add_argument('--type', type=str, default='pinyin4', choices=['pinyin4', '26', 'en3', 'en2'])
+    parser.add_argument('--type', type=str, default='pinyin4',
+                        choices=['pinyin4', 'double', '26', 'en3', 'en2'])
     args = parser.parse_args()
 
     if args.type is None:
@@ -165,6 +166,9 @@ def main():
         words = [prefix + x for x in init_popular_less_3()]
     elif args.type == 'en2':
         words = [prefix + x for x in init_popular_less_2()]
+    elif args.type == 'double':
+        # TODO
+        words = []
     else:
         parser.print_help()
         return
