@@ -46,6 +46,11 @@ def init_popular_less_2():
 def init_popular_less_3():
     return init_popular_less(3)
 
+def init_popular_less_4():
+    return init_popular_less(4)
+
+def abc():
+    return [chr(x) for x in range(ord('a'), ord('z') + 1)]
 
 def init_popular_less(limit):
     f = codecs.open('./popular_less_%d.txt' % limit, encoding='utf-8')
@@ -115,6 +120,25 @@ def can_taken_via_whois(domain, lock):
     return can
 
 
+def can_taken_via_dig_sub(domain, lock):
+    can = True
+    try:
+        process = subprocess.Popen('dig @114.114.114.114 %s' % domain, shell=True,
+                                   stdout=subprocess.PIPE)
+        content = str(process.stdout.read(), encoding='utf-8')
+        # trim ; in lines
+        lines = [x.strip() for x in content.split('\n') if len(x.strip()) > 0 and not x.strip().startswith(';')]
+        # remove SOA section
+        lines = [x.strip() for x in lines if 'SOA' not in x]
+        lines = [x for x in lines if not x == '']
+        if len(lines) > 0:
+            can = False
+    except Exception as e:
+        can = None
+    write_log(domain, lock, can)
+    return can
+
+
 def can_taken_via_dig(domain, lock):
     can = False
     try:
@@ -139,7 +163,8 @@ def search(domains):
 
         # thread.start_new(can_taken_via_whois, (domain, lock))
         # can_taken_via_whois(domain, lock)
-        executor.submit(can_taken_via_dig, domain, lock)
+        # executor.submit(can_taken_via_dig, domain, lock)
+        executor.submit(can_taken_via_dig_sub, domain, lock)
     sys.stdout.write('\n')
     sys.stdout.flush()
 
@@ -149,7 +174,7 @@ def main():
     parser.add_argument('--prefix', type=str, default='')
     parser.add_argument('--suffix', type=str, default='.com')
     parser.add_argument('--type', type=str, default='pinyin4',
-                        choices=['pinyin4', 'double', '26', 'en3', 'en2'])
+                        choices=['pinyin4', 'double', '26', 'en1', 'en2', 'en3', 'en4'])
     args = parser.parse_args()
 
     if args.type is None:
@@ -162,10 +187,14 @@ def main():
         words = [prefix + x for x in init_pinyin_less(4)]
     elif args.type == '26':
         words = [prefix + x for x in init_26()]
-    elif args.type == 'en3':
-        words = [prefix + x for x in init_popular_less_3()]
+    elif args.type == 'en1':
+        words = [prefix + x for x in abc()]
     elif args.type == 'en2':
         words = [prefix + x for x in init_popular_less_2()]
+    elif args.type == 'en3':
+        words = [prefix + x for x in init_popular_less_3()]
+    elif args.type == 'en4':
+        words = [prefix + x for x in init_popular_less_4()]
     elif args.type == 'double':
         # TODO
         words = []
